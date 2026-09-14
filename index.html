@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#f5f5f7">
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:,">
+<title>豊中JC 2027</title>
+<style>
+  /* ── トークン ─────────────────────────────────────────
+     出欠アプリ(/shukketsu/)と同じ値。書体は端末の標準書体、色は無彩色＋アクセント1色(#0071e3)。
+     意味色は出欠の3色(出席/欠席/未定)だけ。影は使わず、面と線と余白で階層を作る。 */
+  :root {
+    --bg: #f5f5f7; --surface: #ffffff; --text: #1d1d1f; --sub: #6e6e73; --hint: #86868b;
+    --line: #d2d2d7; --line-soft: #e8e8ed; --fill: #f2f2f4;
+    --accent: #0071e3; --accent-press: #006edb;
+    --ok: #1c7a42; --ok-soft: #e4f3e9;
+    --ng: #c93c3c; --ng-soft: #fbeaea;
+    --tbd: #9a5b00; --tbd-soft: #fbf0dc;
+    --r-pill: 980px; --r-block: 10px; --r-card: 14px;
+    --ease: cubic-bezier(.4, 0, .6, 1);
+    --font: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic Medium", sans-serif;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { background: var(--bg); -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; font-family: var(--font); font-size: 15px; line-height: 1.55; color: var(--text); background: var(--bg);
+    -webkit-font-smoothing: antialiased; font-feature-settings: "palt"; padding-bottom: env(safe-area-inset-bottom);
+  }
+  a { color: var(--accent); text-decoration: none; }
+  button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+  .num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0s !important; transition-duration: 0s !important; } }
+
+  #app { max-width: 600px; margin: 0 auto; padding: 0 20px 56px; min-height: 100vh; }
+  .screen { animation: fade .22s var(--ease); }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  /* ── 文字階層 ── */
+  .eyebrow { font-size: 12px; font-weight: 500; color: var(--sub); letter-spacing: .04em; }
+  h1.title { font-size: 30px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; margin: 4px 0 0; }
+  h1.title span { font-size: 17px; font-weight: 600; letter-spacing: 0; margin-left: 8px; color: var(--sub); }
+  h2.section { font-size: 13px; font-weight: 600; color: var(--sub); margin: 28px 0 8px; letter-spacing: .02em; display: flex; align-items: baseline; justify-content: space-between; }
+  h2.section a { font-weight: 500; font-size: 12px; }
+  .caption { font-size: 13px; color: var(--sub); }
+
+  /* ── トップ ── */
+  .top { display: flex; justify-content: space-between; align-items: flex-end; padding: 22px 0 12px; }
+  .top .who { text-align: right; font-size: 12px; color: var(--sub); line-height: 1.4; }
+  .top .who b { display: block; color: var(--text); font-weight: 600; font-size: 15px; }
+
+  /* ── 面 ── */
+  .card { background: var(--surface); border-radius: var(--r-card); padding: 18px 18px 16px; }
+  .list { background: var(--surface); border-radius: var(--r-card); overflow: hidden; }
+  .row { display: flex; align-items: center; gap: 14px; padding: 13px 18px; border-top: 1px solid var(--line-soft); min-height: 58px; color: inherit; }
+  .row:first-child { border-top: 0; }
+  a.row, .row.tap { cursor: pointer; transition: background .15s var(--ease); }
+  a.row:active, .row.tap:active { background: var(--fill); }
+  .row .main { flex: 1; min-width: 0; }
+  .row .t { font-size: 15px; font-weight: 600; letter-spacing: -.005em; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .row .c { font-size: 12px; color: var(--sub); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .c.wrap { white-space: normal; line-height: 1.5; }
+  .date-col { width: 46px; flex-shrink: 0; text-align: center; line-height: 1.1; }
+  .date-col .d { font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
+  .date-col .w { font-size: 11px; color: var(--sub); margin-top: 3px; }
+  .date-col.blank .d { color: var(--hint); font-weight: 500; font-size: 13px; }
+  .date-col.range { width: 74px; }
+  .date-col.range .d { font-size: 13px; white-space: nowrap; }
+  .chev { width: 8px; height: 8px; border-right: 1.5px solid var(--line); border-bottom: 1.5px solid var(--line); transform: rotate(-45deg); flex-shrink: 0; }
+  .chip { font-size: 12px; color: var(--hint); flex-shrink: 0; }
+  .chip.todo { color: var(--accent); font-weight: 600; }
+
+  /* ── 出欠の印 ── */
+  .mark { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; font-size: 14px; font-weight: 700; flex-shrink: 0; background: var(--fill); color: var(--sub); }
+  .mark.o { background: var(--ok-soft); color: var(--ok); }
+  .mark.x { background: var(--ng-soft); color: var(--ng); }
+  .mark.t { background: var(--tbd-soft); color: var(--tbd); }
+  .mark.n { background: transparent; border: 1.5px dashed var(--line); }
+  .marks { display: flex; gap: 6px; flex-shrink: 0; }
+
+  /* ── つぎの予定 ── */
+  .hero { background: var(--surface); border-radius: var(--r-card); padding: 20px 18px 18px; }
+  .hero .when { display: flex; align-items: baseline; gap: 10px; }
+  .hero .when .d { font-size: 34px; font-weight: 700; letter-spacing: -.03em; line-height: 1; }
+  .hero .when .w { font-size: 14px; color: var(--sub); }
+  .hero .when .in { margin-left: auto; font-size: 13px; color: var(--sub); }
+  .hero .when .in b { color: var(--text); font-weight: 700; font-size: 17px; letter-spacing: -.02em; margin: 0 1px; }
+  h3.ev-title { font-size: 22px; font-weight: 700; letter-spacing: -.015em; line-height: 1.25; margin: 6px 0 0; }
+  .hero .meta { font-size: 13px; color: var(--sub); margin-top: 6px; }
+  .hero .meta span + span::before { content: "·"; margin: 0 6px; color: var(--line); }
+  .deadline { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--sub); margin-top: 10px; }
+  .deadline.soon { color: var(--accent); font-weight: 600; }
+  .deadline.over { color: var(--hint); }
+  .deadline .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .mine { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
+  .mine .lab { font-size: 12px; color: var(--sub); }
+  .mine .slots { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 8px; }
+  .mine .slot { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
+  .mine .slot .sn { color: var(--sub); font-size: 13px; }
+  .mine .slot .sv { font-weight: 600; }
+  .mine .slot .sv.none { color: var(--accent); }
+  .mine .slot .sv.none.over { color: var(--hint); font-weight: 500; }
+  .hero .act { margin-top: 14px; display: flex; align-items: center; gap: 16px; }
+  .hero .people { display: block; margin-top: 14px; font-size: 13px; }
+
+  /* ── ボタン ── */
+  .btn { display: inline-flex; align-items: center; justify-content: center; height: 44px; padding: 0 22px; border-radius: var(--r-pill); background: var(--accent); color: #fff; font-weight: 600; font-size: 15px; transition: transform .12s var(--ease), background .15s var(--ease); }
+  .btn:active { transform: scale(.97); background: var(--accent-press); }
+  .btn.full { width: 100%; }
+  .btn.quiet { background: var(--fill); color: var(--text); }
+  .btn.small { height: 34px; padding: 0 14px; font-size: 13px; }
+  .link { color: var(--accent); font-size: 13px; }
+
+  /* ── 読み込み中の骨組み ── */
+  .sk { background: var(--fill); border-radius: 6px; animation: pulse 1.4s var(--ease) infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+  .sk.h34 { height: 34px; width: 96px; } .sk.h22 { height: 22px; width: 70%; margin-top: 10px; } .sk.h13 { height: 13px; width: 40%; margin-top: 10px; }
+  .sk.row { height: 58px; border-radius: 0; margin: 0; padding: 0; border: 0; }
+
+  /* ── 状態(空・エラー) ── */
+  .state { font-size: 14px; color: var(--sub); }
+  .state b { display: block; color: var(--text); font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+  .state.err b { color: var(--ng); }
+  .stale { font-size: 12px; color: var(--hint); margin: 8px 2px 0; display: flex; gap: 12px; align-items: center; }
+
+  /* ── 2027年の流れ(帯) ── */
+  .strip { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 0; padding: 14px 8px 12px; }
+  .strip .m { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 0; border-radius: 8px; color: inherit; min-width: 0; transition: background .15s var(--ease); }
+  .strip .m:active { background: var(--fill); }
+  .strip .m .n { font-size: 12px; font-weight: 600; color: var(--sub); line-height: 1; }
+  .strip .m.now .n { color: #fff; background: var(--accent); width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; }
+  .strip .m .dd { display: flex; flex-direction: column; gap: 3px; min-height: 24px; align-items: center; }
+  .strip .m .dd i { width: 7px; height: 7px; border-radius: 50%; background: var(--text); display: block; }
+  .strip .m .dd i.kari { background: transparent; border: 1.5px solid var(--line); width: 6px; height: 6px; }
+  .legend { font-size: 11px; color: var(--hint); padding: 0 18px 12px; display: flex; gap: 14px; }
+  .legend i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--text); margin-right: 5px; vertical-align: 1px; }
+  .legend i.kari { background: transparent; border: 1.5px solid var(--line); width: 6px; height: 6px; }
+  .strip-list .row { min-height: 50px; padding: 10px 18px; }
+
+  /* ── フッター ── */
+  .foot { margin-top: 36px; font-size: 12px; color: var(--hint); line-height: 1.8; }
+  .foot a { color: var(--sub); }
+
+  /* ── 広い画面: 「いま」と「アプリ」を左右に ── */
+  @media (min-width: 900px) {
+    #app { max-width: 960px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 32px; align-items: start; }
+    .grid > .col h2.section:first-child { margin-top: 6px; }
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(function () {
+  'use strict';
+
+  // ── 置き場所。出欠アプリと同じオリジン(toyonakajc2027.github.io)なので端末の記憶を共有できる
+  var APP = '/shukketsu/';
+  var NENKAN = '/shukketsu/nenkan/';
+  var NENKAN_DATA = NENKAN + 'events.json';
+  var API_URL = 'https://script.google.com/macros/s/AKfycbx7TLx7kJlXOzXhgfDRT3kZtinihWaK79-L6QCMigKtzlKGPwQFfdHEZ1Hx3DycKKsmFg/exec';
+  var MOCK = window.HOME_MOCK || null;
+  if (MOCK && MOCK.paths) { APP = MOCK.paths.app; NENKAN = MOCK.paths.nenkan; NENKAN_DATA = MOCK.paths.data; }
+
+  // ── 端末の記憶(出欠アプリが保存したもの。ここでは読むだけ、消さない)
+  var K_PASS = 'tjc.pass', K_ME = 'tjc.me', K_ROLE = 'tjc.role', K_CACHE = 'tjc.home.cache';
+  var store = {
+    get: function (k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+
+  var q = parseQuery();
+  var S = { pass: store.get(K_PASS), me: store.get(K_ME), role: store.get(K_ROLE), events: [], today: '', boot: null };
+  if (q.me) S.me = normName(q.me);
+  var app = document.getElementById('app');
+
+  // ── アプリへのリンク。?me= で開かれた時はそのまま渡す(出欠アプリ側が記憶する)
+  function appUrl(params) {
+    var p = [];
+    for (var k in params) if (params[k] !== undefined && params[k] !== '') p.push(encodeURIComponent(k) + '=' + encodeURIComponent(params[k]));
+    if (q.me) p.push('me=' + encodeURIComponent(q.me));
+    return APP + (p.length ? '?' + p.join('&') : '');
+  }
+
+  // ── 骨組み(静的な部分)。動く部分は #now #soon #year に流し込む
+  function shell() {
+    app.innerHTML =
+      '<div class="screen">' +
+      '<div class="top"><div><div class="eyebrow">豊中青年会議所</div><h1 class="title">豊中JC<span>2027</span></h1></div>' +
+      '<div class="who" id="who"></div></div>' +
+      '<div class="grid">' +
+      '<div class="col"><div id="now"></div><div id="soon"></div></div>' +
+      '<div class="col"><h2 class="section">アプリ</h2><div class="list" id="apps"></div><div id="year"></div></div>' +
+      '</div>' +
+      '<div class="foot">2027年度メンバー用の入口。開けない・名前が違うなどは、専務（中村）までLINEで。</div>' +
+      '</div>';
+    drawWho();
+    drawApps();
+  }
+  function drawWho() {
+    var name = S.me ? S.me.replace(/ /g, '') : '';
+    document.getElementById('who').innerHTML = name ? '<b>' + esc(name) + '</b>' + (S.pass ? '<a href="' + appUrl({ p: S.me }) + '">出席記録</a>' : '') : '';
+  }
+
+  function drawApps() {
+    var name = S.me ? S.me.replace(/ /g, '') : '';
+    var h = '';
+    h += '<a class="row" href="' + appUrl({}) + '"><div class="main"><div class="t">出欠</div><div class="c wrap">例会や行事に出るか答える。締切と、まだ答えていない人が見える</div></div><div class="chev"></div></a>';
+    h += '<a class="row" href="' + NENKAN + '"><div class="main"><div class="t">年間予定</div><div class="c wrap">2027年の理事会・委員会・例会・大会。月ごとと一覧で見る</div></div><div class="chev"></div></a>';
+    if (S.pass && S.me) h += '<a class="row" href="' + appUrl({ p: S.me }) + '"><div class="main"><div class="t">出席記録</div><div class="c wrap">' + esc(name) + ' さんのこれまでの出席率と回答の履歴</div></div><div class="chev"></div></a>';
+    if (S.pass && S.boot) {   // サーバーで確認できた役割で出し分け(出欠アプリの下部リンクと同じ)
+      var admin = S.boot.role === 'admin';
+      h += '<a class="row" href="' + appUrl({ admin: '1' }) + '"><div class="main"><div class="t">' + (admin ? '役員メニュー' : '予定の登録・リマインド') + '</div><div class="c wrap">' + (admin ? '予定の登録、締切、リマインド、集計、名簿' : '予定を登録する。未回答の人にLINEで知らせる') + '</div></div><div class="chev"></div></a>';
+    }
+    document.getElementById('apps').innerHTML = h;
+  }
+
+  // ── つぎの予定(出欠アプリのデータ)
+  function drawNowSkeleton() {
+    document.getElementById('now').innerHTML = '<h2 class="section" style="margin-top:6px">つぎの予定</h2><div class="hero"><div class="sk h34"></div><div class="sk h22"></div><div class="sk h13"></div></div>';
+    document.getElementById('soon').innerHTML = '<h2 class="section">これから</h2><div class="list"><div class="sk row"></div><div class="sk row" style="border-top:1px solid var(--line-soft)"></div></div>';
+  }
+  function drawFirstTime() {
+    document.getElementById('now').innerHTML =
+      '<h2 class="section" style="margin-top:6px">つぎの予定</h2>' +
+      '<div class="card"><div class="state"><b>出欠アプリをまだ開いていません</b>LINEで案内している合言葉を出欠アプリに1回入れると、ここにあなたの予定と回答が出るようになります。</div>' +
+      '<div style="margin-top:14px"><a class="btn full" href="' + appUrl({}) + '">出欠をはじめる</a></div></div>';
+    document.getElementById('soon').innerHTML = '';
+  }
+  function drawPassChanged() {
+    document.getElementById('now').innerHTML =
+      '<h2 class="section" style="margin-top:6px">つぎの予定</h2>' +
+      '<div class="card"><div class="state"><b>合言葉が変わったようです</b>出欠アプリを開いて、LINEで案内している新しい合言葉を入れてください。入れ直すと、ここにも予定と回答が出ます。</div>' +
+      '<div style="margin-top:14px"><a class="btn full" href="' + appUrl({}) + '">出欠アプリをひらく</a></div></div>';
+    document.getElementById('soon').innerHTML = '';
+  }
+  function drawNowError(msg, hasCache) {
+    if (hasCache) {
+      var el = document.getElementById('stale');
+      if (el) el.innerHTML = '<span>最新の状態を取れませんでした。表示は前回のものです。</span><button class="link" id="retry">もう一度</button>';
+    } else {
+      document.getElementById('now').innerHTML =
+        '<h2 class="section" style="margin-top:6px">つぎの予定</h2>' +
+        '<div class="card"><div class="state err"><b>予定を読み込めませんでした</b>' + esc(msg) + '</div>' +
+        '<div style="margin-top:14px"><button class="btn small quiet" id="retry">もう一度読み込む</button></div></div>';
+      document.getElementById('soon').innerHTML = '';
+    }
+    var r = document.getElementById('retry');
+    if (r) r.onclick = function () { loadNow(true); };
+  }
+  function drawNow(b) {
+    var ev = b.events || [];
+    var up = ev.filter(function (e) { return e.date && e.date >= b.today; });
+    var hero = up[0] || null;
+    var rest = up.slice(1, 5);
+    var nowEl = document.getElementById('now'), soonEl = document.getElementById('soon');
+    if (!hero) {
+      nowEl.innerHTML = '<h2 class="section" style="margin-top:6px">つぎの予定</h2><div class="card"><div class="state"><b>これからの予定はまだ登録されていません</b>登録されると、ここに日付と回答の状態が出ます。</div></div><div class="stale" id="stale"></div>';
+      soonEl.innerHTML = '';
+      return;
+    }
+    nowEl.innerHTML = '<h2 class="section" style="margin-top:6px">つぎの予定</h2>' + heroCard(hero, b) + '<div class="stale" id="stale"></div>';
+    var undatedRow = b.undated ? '<a class="row" href="' + appUrl({}) + '"><div class="date-col blank"><div class="d">未定</div></div><div class="main"><div class="t">日付がまだ決まっていない予定 ' + b.undated + '件</div><div class="c">出欠アプリの一覧で見られます</div></div><div class="chev"></div></a>' : '';
+    soonEl.innerHTML = (rest.length || undatedRow)
+      ? '<h2 class="section">これから<a href="' + appUrl({}) + '">すべての予定</a></h2><div class="list">' + rest.map(eventRow).join('') + undatedRow + '</div>'
+      : '';
+  }
+  function heroCard(ev, b) {
+    var d = splitDate(ev.date);
+    var days = daysUntil(ev.date);
+    var inTxt = days > 1 ? 'あと<b class="num">' + days + '</b>日' : days === 1 ? '<b>明日</b>' : '<b>今日</b>';
+    var h = '<div class="hero">' +
+      '<div class="when"><div class="d num">' + d.md + '</div><div class="w">' + d.w + '</div><div class="in">' + inTxt + '</div></div>' +
+      '<h3 class="ev-title">' + esc(ev.title || ev.name) + '</h3>' +
+      '<div class="meta">' + (ev.place ? '<span>' + esc(ev.place) + '</span>' : '') + (ev.target && ev.target !== '全員' ? '<span>対象: ' + esc(ev.target) + '</span>' : '') + '</div>' +
+      deadlineLine(ev);
+    if (b.me) {
+      var mine = ev.mineAll || ev.slots.map(function (s, i) { return i === 0 ? (ev.mine || '') : ''; });
+      var missing = mine.some(function (v) { return !v; });
+      h += '<div class="mine"><div class="lab">あなたの回答</div><div class="slots">' +
+        ev.slots.map(function (s, i) {
+          var v = mine[i] || '';
+          var mk = v ? markHtml(v) : '<span class="mark n"></span>';
+          var label = v ? statusLabel(v) : (ev.closed ? '未回答' : '未回答');
+          return '<div class="slot">' + mk + (ev.slots.length > 1 ? '<span class="sn">' + esc(s) + '</span>' : '') + '<span class="sv' + (v ? '' : ' none' + (ev.closed ? ' over' : '')) + '">' + esc(label) + '</span></div>';
+        }).join('') + '</div>';
+      if (ev.closed) h += '';
+      else if (missing) h += '<div class="act"><a class="btn full" href="' + appUrl({ e: ev.eventId }) + '">出欠を答える</a></div>';
+      else h += '<div class="act"><a class="link" href="' + appUrl({ e: ev.eventId }) + '">回答を変える</a></div>';
+      h += '</div>';
+    } else {
+      h += '<div class="mine"><div class="state">名前をまだ選んでいません。出欠アプリで1回選ぶと、ここに回答が出ます。</div><div class="act"><a class="btn full" href="' + appUrl({ e: ev.eventId }) + '">名前を選んで答える</a></div></div>';
+    }
+    var c = ev.counts || { o: 0, x: 0, none: 0 };
+    h += '<a class="people num" href="' + appUrl({ e: ev.eventId }) + '">みんなの回答を見る（出席 ' + c.o + ' · 欠席 ' + c.x + ' · 未回答 ' + c.none + '）</a>';
+    h += '</div>';
+    return h;
+  }
+  function eventRow(ev) {
+    var d = splitDate(ev.date);
+    var mine = ev.mine || '';
+    var right = mine ? markHtml(mine) : (ev.closed ? '<span class="chip">未回答</span>' : '<span class="chip todo">未回答</span>');
+    var c = ev.counts || { o: 0, x: 0, none: 0 };
+    return '<a class="row" href="' + appUrl({ e: ev.eventId }) + '">' +
+      '<div class="date-col"><div class="d num">' + d.md + '</div><div class="w">' + d.w + '</div></div>' +
+      '<div class="main"><div class="t">' + esc(ev.title || ev.name) + '</div><div class="c num">出席 ' + c.o + ' · 欠席 ' + c.x + ' · 未回答 ' + c.none + '</div></div>' +
+      right + '<div class="chev"></div></a>';
+  }
+  function deadlineLine(ev) {
+    if (!ev.deadline && !ev.date) return '';
+    var txt, cls = '';
+    if (ev.closed) { txt = '回答は締め切りました'; cls = ' over'; }
+    else if (ev.deadline) {
+      var days = daysUntil(ev.deadline.slice(0, 10));
+      txt = '回答期限 ' + ev.deadline.slice(5, 16).replace(/^0/, '').replace(/\/0/, '/') + (days > 1 ? ' · あと' + days + '日' : days === 1 ? ' · 明日まで' : ' · 今日まで');
+      if (days <= 2) cls = ' soon';
+    } else {
+      var d2 = daysUntil(ev.date);
+      txt = d2 > 0 ? '締切はありません。開催日まで答えられます' : '本日開催';
+    }
+    return '<div class="deadline num' + cls + '"><span class="dot"></span>' + esc(txt) + '</div>';
+  }
+  function markHtml(v) {
+    var c = (v === '〇' || v === '○') ? 'o' : v === '×' ? 'x' : v === '△' ? 't' : '';
+    var s = c === 'o' ? '○' : c === 'x' ? '×' : c === 't' ? '△' : v;
+    return '<span class="mark ' + c + '">' + esc(s) + '</span>';
+  }
+  function statusLabel(v) { return (v === '〇' || v === '○') ? '出席' : v === '×' ? '欠席' : v === '△' ? '未定' : v; }
+
+  function loadNow(force) {
+    if (!S.pass) { try { localStorage.removeItem(K_CACHE); } catch (e) {} drawFirstTime(); return; }
+    var cached = null;
+    try { cached = JSON.parse(store.get(K_CACHE) || 'null'); } catch (e) {}
+    if (cached && (!cached.savedAt || Date.now() - cached.savedAt > 7 * 86400000)) cached = null;   // 1週間より古い記憶は使わない
+    if (cached && cached.me === S.me && !force) { cached.today = deviceToday(); S.boot = cached; drawNow(cached); } else drawNowSkeleton();
+    call('getBootstrap', S.pass, S.me).then(function (b) {
+      if (!b || !b.ok) { drawPassChanged(); return; }   // 合言葉が変わった等。アプリ側で入れ直してもらう
+      S.role = b.role;
+      if (S.me !== (b.me || '')) { S.me = b.me || ''; drawWho(); }   // 名簿から消えた名前は表示しない(端末の記憶は出欠アプリ側が整理する)
+      var slim = { ok: true, me: b.me, today: b.today, role: b.role, savedAt: Date.now(),
+        events: (b.events || []).filter(function (e) { return e.date && e.date >= b.today; }).slice(0, 8),
+        undated: (b.events || []).filter(function (e) { return !e.date; }).length };
+      store.set(K_CACHE, JSON.stringify(slim));
+      S.boot = slim;
+      drawNow(slim);
+      drawApps();
+    }).catch(function (err) { drawNowError(err.message, !!(cached && cached.me === S.me)); });
+  }
+  function call(fn) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    if (MOCK) return new Promise(function (res, rej) { setTimeout(function () { if (MOCK.fail) rej(new Error(MOCK.fail)); else res(MOCK.bootstrap); }, MOCK.delay || 400); });
+    return fetch(API_URL, { method: 'POST', body: JSON.stringify({ fn: fn, args: args }), headers: { 'Content-Type': 'text/plain;charset=utf-8' }, credentials: 'omit', redirect: 'follow' })
+      .catch(function () { throw new Error('サーバーに接続できません。電波を確認して、もう一度開いてください。'); })
+      .then(function (r) { return r.json().catch(function () { throw new Error('サーバーの返事が読めませんでした。時間をおいて、もう一度開いてください。'); }); })
+      .then(function (j) { if (j && j.ok) return j.result; throw new Error(j && j.error || 'サーバーでエラーが起きました。時間をおいて、もう一度開いてください。'); });
+  }
+
+  // ── 2027年の流れ(年間予定のデータ)。大会・会議は実線の点、例会(仮)は点線の点
+  function loadYear() {
+    var p = MOCK && MOCK.year ? Promise.resolve(MOCK.year) : fetch(NENKAN_DATA, { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
+    p.then(drawYear).catch(function () { document.getElementById('year').innerHTML = ''; });   // 取れなければ帯は出さない(古い情報を出すより無い方がよい)
+  }
+  function drawYear(list) {
+    var Y = 2027;
+    var major = [], reikaiMonths = {};
+    var cur = null;
+    (list || []).forEach(function (e) {
+      if (!e.d || e.d.slice(0, 4) !== String(Y)) return;
+      if (e.c === 'reikai') { reikaiMonths[+e.d.slice(5, 7)] = true; return; }
+      if (e.c !== 'honkai' && e.c !== 'block' && e.c !== 'lom') return;
+      var base = String(e.t || '').replace(/[（(].*$/, '').trim();
+      if (cur && cur.base === base && cur.c === e.c && nextDay(cur.to) === e.d) { cur.to = e.d; return; }
+      cur = { base: base, c: e.c, from: e.d, to: e.d, kento: !!(e.s === 'kento' || e.k) };
+      major.push(cur);
+    });
+    if (!major.length) { document.getElementById('year').innerHTML = ''; return; }
+    var byMonth = {};
+    major.forEach(function (m) { var mo = +m.from.slice(5, 7); (byMonth[mo] = byMonth[mo] || []).push(m); });
+    var now = new Date(), nowM = now.getFullYear() === Y ? now.getMonth() + 1 : 0;
+    var strip = '';
+    for (var m = 1; m <= 12; m++) {
+      var items = byMonth[m] || [];
+      var tip = items.map(function (it) { return it.base; }).concat(reikaiMonths[m] ? ['例会(仮)'] : []).join('、');
+      strip += '<a class="m' + (m === nowM ? ' now' : '') + '" href="' + NENKAN + '#m' + m + '" title="' + esc(m + '月: ' + (tip || '大会・例会なし')) + '"><span class="n num">' + m + '</span>' +
+        '<span class="dd">' + items.map(function () { return '<i></i>'; }).join('') + (reikaiMonths[m] ? '<i class="kari"></i>' : '') + '</span>' +
+        '</a>';
+    }
+    var rows = major.map(function (it) {
+      var f = it.from.slice(5, 7).replace(/^0/, '') + '/' + it.from.slice(8, 10).replace(/^0/, '');
+      var t = it.to === it.from ? '' : '〜' + (it.to.slice(5, 7) === it.from.slice(5, 7) ? it.to.slice(8, 10).replace(/^0/, '') : it.to.slice(5, 7).replace(/^0/, '') + '/' + it.to.slice(8, 10).replace(/^0/, ''));
+      var days = it.to === it.from ? 1 : Math.round((new Date(it.to) - new Date(it.from)) / 86400000) + 1;
+      var wd = WD[new Date(+it.from.slice(0, 4), +it.from.slice(5, 7) - 1, +it.from.slice(8, 10)).getDay()];
+      return '<a class="row" href="' + NENKAN + '#m' + (+it.from.slice(5, 7)) + '">' +
+        '<div class="date-col range"><div class="d num">' + f + t + '</div><div class="w">' + (days > 1 ? days + '日間' : wd) + '</div></div>' +
+        '<div class="main"><div class="t">' + esc(it.base) + '</div><div class="c">' + catName(it.c) + '</div></div>' +
+        '<div class="chev"></div></a>';
+    }).join('');
+    document.getElementById('year').innerHTML =
+      '<h2 class="section">2027年の流れ<a href="' + NENKAN + '#year">年間予定をひらく</a></h2>' +
+      '<div class="list"><div class="strip">' + strip + '</div>' +
+      '<div class="legend"><span><i></i>大会・会議</span><span><i class="kari"></i>例会（仮）</span></div>' +
+      '<div class="strip-list">' + rows + '</div></div>';
+  }
+  function catName(c) { return c === 'honkai' ? '日本JC・JCI' : c === 'block' ? '大阪ブロック' : c === 'lom' ? '豊中JC' : ''; }
+  function nextDay(ymd) { var d = new Date(+ymd.slice(0, 4), +ymd.slice(5, 7) - 1, +ymd.slice(8, 10) + 1); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+
+  // ── 小道具
+  var WD = ['日', '月', '火', '水', '木', '金', '土'];
+  function splitDate(ymd) {
+    if (!ymd || !/^\d{4}\/\d{2}\/\d{2}/.test(ymd)) return { md: '', w: '' };
+    var y = +ymd.slice(0, 4), m = +ymd.slice(5, 7), d = +ymd.slice(8, 10);
+    return { md: m + '/' + d, w: WD[new Date(y, m - 1, d).getDay()] };
+  }
+  function daysUntil(ymd) {
+    var a = new Date(+ymd.slice(0, 4), +ymd.slice(5, 7) - 1, +ymd.slice(8, 10));
+    var t = S.boot && S.boot.today ? S.boot.today : (MOCK && MOCK.bootstrap ? MOCK.bootstrap.today : '');
+    var b = t ? new Date(+t.slice(0, 4), +t.slice(5, 7) - 1, +t.slice(8, 10)) : new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+    return Math.round((a - b) / 86400000);
+  }
+  function deviceToday() { var d = new Date(); return d.getFullYear() + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + ('0' + d.getDate()).slice(-2); }
+  function normName(v) { return String(v || '').replace(/[\s　]+/g, ' ').trim(); }
+  function parseQuery() {
+    var o = {}; location.search.replace(/^\?/, '').split('&').forEach(function (kv) { if (!kv) return; var a = kv.split('='); o[decodeURIComponent(a[0])] = decodeURIComponent(a[1] || ''); });
+    return o;
+  }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  // ── 起動
+  shell();
+  loadNow(false);
+  loadYear();
+})();
+</script>
+</body>
+</html>
