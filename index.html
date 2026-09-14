@@ -336,7 +336,7 @@
     var cached = null;
     try { cached = JSON.parse(store.get(K_CACHE) || 'null'); } catch (e) {}
     if (cached && (!cached.savedAt || Date.now() - cached.savedAt > 7 * 86400000)) cached = null;   // 1週間より古い記憶は使わない
-    if (cached && cached.me === S.me && !force) { cached.today = deviceToday(); S.boot = cached; drawNow(cached); } else drawNowSkeleton();
+    if (cached && cached.me === S.me && !force) { cached.today = deviceToday(); S.boot = cached; drawNow(cached); } else if (!S.retried) drawNowSkeleton();
     call('getBootstrap', S.pass, S.me).then(function (b) {
       if (!b || !b.ok) { drawPassChanged(); return; }   // 合言葉が変わった等。アプリ側で入れ直してもらう
       S.role = b.role;
@@ -348,7 +348,11 @@
       S.boot = slim;
       drawNow(slim);
       drawApps();
-    }).catch(function (err) { drawNowError(err.message, !!(cached && cached.me === S.me)); });
+    }).catch(function (err) {
+      // GAS は初回に一時的なエラーページを返すことがある(本番で1回観測)。1回だけ黙って再試行してから、はじめてエラーを見せる
+      if (!S.retried) { S.retried = true; setTimeout(function () { loadNow(force); }, 1500); return; }
+      drawNowError(err.message, !!(cached && cached.me === S.me));
+    });
   }
   function call(fn) {
     var args = Array.prototype.slice.call(arguments, 1);
